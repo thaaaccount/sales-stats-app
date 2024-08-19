@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from pygam import GAM, s
-from sklearn.preprocessing import LabelEncoder
 import plotly.express as px
+import pickle
 
 # Streamlit app
 st.title("Sales Data Analysis")
@@ -24,9 +23,6 @@ if uploaded_file is not None:
     df['UnitCost'] = df['UnitCost'].astype(float)
     df['Revenue'] = df['UnitPrice'] * df['Quantity']
     df['OrderDate_Year'] = df['OrderDate_Year'].astype(str)
-
-    label_encoder = LabelEncoder()
-    df['LongItem_encoded'] = label_encoder.fit_transform(df['LongItem'])
 
     df['UnitPrice'] = pd.to_numeric(df['UnitPrice'], errors='coerce')
     df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
@@ -69,19 +65,19 @@ if uploaded_file is not None:
     with tab3:
         st.subheader("Quantity Distribution per LongItem")
         fig = px.box(df, x='LongItem', y='Quantity', title='Quantity Distribution per LongItem')
-        st.plotly_chart(fig, use_container_width=True)  # `use_container_width=True` ensures it uses the available space
+        st.plotly_chart(fig, use_container_width=True)
 
     with tab4:
         st.subheader("Quantity VS Unit Price")
         fig = px.scatter(df, x='UnitPrice', y='Quantity', color='LongItem', title='Quantity vs UnitPrice')
-        st.plotly_chart(fig, use_container_width=True)  # `use_container_width=True` ensures it uses the available space
+        st.plotly_chart(fig, use_container_width=True)
 
     with tab5:
         st.subheader("Monthly Revenue Trend")
         df['OrderDate'] = pd.to_datetime(df['OrderDate_Year'].astype(str) + '-' + df['OrderDate_Month'].astype(str) + '-01')
         monthly_revenue = df.groupby(['OrderDate', 'LongItem']).agg({'Revenue': 'sum'}).reset_index()
         fig = px.line(monthly_revenue, x='OrderDate', y='Revenue', color='LongItem', title='Monthly Revenue Trend per LongItem')
-        st.plotly_chart(fig, use_container_width=True)  # `use_container_width=True` ensures it uses the available space
+        st.plotly_chart(fig, use_container_width=True)
 
     with tab6:
         st.subheader("Python Price vs Revenue Analysis")
@@ -99,11 +95,13 @@ if uploaded_file is not None:
 
         gams = {}
         for item in df_agg['LongItem'].unique():
-            subset = df_agg[df_agg['LongItem'] == item]
-            X = subset[['UnitPrice']].to_numpy()  # Ensure X is a dense numpy array
-            y = subset['Revenue']
-            gam = GAM(s(0)).fit(X, y)
-            gams[item] = gam
+            try:
+                # Load pre-trained model from .pkl file
+                with open(f'{item}_gam_model.pkl', 'rb') as f:
+                    gams[item] = pickle.load(f)
+            except FileNotFoundError:
+                st.warning(f"No pre-trained model found for {item}. Skipping...")
+                continue
 
         df_agg['Predicted_Revenue'] = np.nan
         for item in gams:
@@ -136,7 +134,7 @@ if uploaded_file is not None:
             title_font=dict(size=10),
             tickfont=dict(size=10),
         )
-        st.plotly_chart(fig, use_container_width=True)  # `use_container_width=True` ensures it uses the available space
+        st.plotly_chart(fig, use_container_width=True)
 
 else:
     st.write("Please upload a CSV file to view the data and summary statistics.")
