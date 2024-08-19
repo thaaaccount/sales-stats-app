@@ -1,6 +1,6 @@
 streamlit
 pandas
-numpy==1.19.5
+numpy
 pygam
 scikit-learn
 plotly
